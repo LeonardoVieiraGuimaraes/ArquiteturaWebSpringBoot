@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  arquiteturawebspringboot:
+  spring-app:
     build:
       context: .
       dockerfile: Dockerfile.spring
