@@ -26,8 +26,8 @@ jobs:
       - name: ☕ Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '24'
-          distribution: 'eclipse-temurin'
+          java-version: '21'
+          distribution: 'temurin'
           cache: maven
 
       - name: 🔧 Make Maven wrapper executable
@@ -88,3 +88,4 @@ jobs:
           echo "🎉 Deployment completed!"
           echo "📝 Application available at: https://arqwebv01.leoproti.com.br"
           echo "🔗 Local server: http://localhost:8012"
+          echo "☕ Java Version: 21 (LTS)"
