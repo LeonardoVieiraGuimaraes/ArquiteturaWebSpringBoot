@@ -16,6 +16,16 @@ spring:
       path: /h2-console
       settings:
         web-allow-others: true
+
 server:
   servlet:
     context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

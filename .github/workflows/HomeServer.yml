@@ -1,0 +1,90 @@
+name: Deploy Spring Boot App to Home Server
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'comandos.txt'
+      - '**/*.md'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: 🏠 Build and Deploy to Home Server
+    runs-on: ubuntu-latest
+    
+    env:
+      SPRING_PROFILES_ACTIVE: prod
+      MAVEN_OPTS: -Xmx2048m
+    
+    steps:
+      - name: 🚚 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'eclipse-temurin'
+          cache: maven
+
+      - name: 🔧 Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
+      - name: 🧪 Run tests
+        run: ./mvnw clean test
+
+      - name: 🔨 Build Spring Boot application
+        run: ./mvnw clean package -DskipTests
+
+      - name: 🔑 Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOME_SERVER_SSH_KEY }}
+
+      - name: 🧹 Clean and prepare server
+        run: |
+          ssh leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
+            # Parar aplicação se estiver rodando
+            docker stop arqwebv01-app || true
+            docker rm arqwebv01-app || true
+            
+            # Criar pasta projetos se não existir
+            mkdir -p /home/leonardovieiraxy/projetos/arqwebv01
+          EOF
+
+      - name: 📤 Transfer project files
+        run: |
+          # Transferir arquivos necessários
+          scp docker-compose.yml leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+          scp Dockerfile.spring leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+          scp -r target leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+
+      - name: 🚀 Deploy on server
+        run: |
+          ssh leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
+            cd /home/leonardovieiraxy/projetos/arqwebv01
+            
+            # Build e start do container
+            docker compose build --no-cache
+            docker compose up -d
+            
+            # Aguardar inicialização
+            sleep 20
+            
+            # Verificar se está rodando
+            docker compose ps
+            
+            # Teste básico na porta 8012
+            curl -f http://localhost:8012/actuator/health || \
+            curl -f http://localhost:8012/ || \
+            echo "Application ainda não respondeu"
+          EOF
+
+      - name: ✅ Deployment Summary
+        run: |
+          echo "🎉 Deployment completed!"
+          echo "📝 Application available at: https://arqwebv01.leoproti.com.br"
+          echo "🔗 Local server: http://localhost:8012"

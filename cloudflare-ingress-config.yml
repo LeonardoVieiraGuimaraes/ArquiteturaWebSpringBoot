@@ -1,0 +1,31 @@
+# Adicione esta configuração ao seu ingress do Cloudflare:
+
+ingress:
+  - hostname: leoproti.com.br
+    service: http://localhost:8080
+  - hostname: www.leoproti.com.br
+    service: http://localhost:8080
+  - hostname: ssh.leoproti.com.br
+    service: ssh://localhost:22
+  - hostname: aeg.leoproti.com.br
+    service: http://localhost:3001
+  - hostname: casaos.leoproti.com.br
+    service: http://localhost:80
+  - hostname: nextcloud.leoproti.com.br
+    service: https://localhost:10443
+    originRequest:
+      noTLSVerify: true
+  - hostname: sae.leoproti.com.br
+    service: http://localhost:8002
+  - hostname: recepcao.leoproti.com.br
+    service: http://localhost:8010
+  - hostname: duplicati.leoproti.com.br
+    service: http://localhost:8200
+  - hostname: cloudflared.leoproti.com.br
+    service: http://localhost:8090
+  - hostname: grafana.leoproti.com.br
+    service: http://localhost:3000
+  # NOVA ENTRADA PARA A APLICAÇÃO SPRING BOOT:
+  - hostname: arqwebv01.leoproti.com.br
+    service: http://localhost:8012
+  - service: http_status:404
