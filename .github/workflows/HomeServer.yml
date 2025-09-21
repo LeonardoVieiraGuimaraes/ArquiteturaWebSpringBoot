@@ -39,32 +39,73 @@ jobs:
       - name: 🔨 Build Spring Boot application
         run: ./mvnw clean package -DskipTests
 
+      - name: ☁️ Setup Cloudflare
+        run: |
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+
       - name: 🔑 Setup SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HOME_SERVER_SSH_KEY }}
 
+      - name: 🔐 Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "Host ssh.leoproti.com.br" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+          echo "  ConnectTimeout 30" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
       - name: 🧹 Clean and prepare server
         run: |
-          ssh leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
-            # Parar aplicação se estiver rodando
-            docker stop arqwebv01-app || true
-            docker rm arqwebv01-app || true
-            
-            # Criar pasta projetos se não existir
-            mkdir -p /home/leonardovieiraxy/projetos/arqwebv01
+          echo "Trying to connect to server..."
+          
+          # Função para executar comandos SSH
+          execute_ssh() {
+            ssh -o ProxyCommand="cloudflared access ssh --hostname %h" \
+                -o ConnectTimeout=30 \
+                -o StrictHostKeyChecking=no \
+                leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
+              # Parar aplicação se estiver rodando
+              docker stop arqwebv01-app || true
+              docker rm arqwebv01-app || true
+              
+              # Criar pasta projetos se não existir
+              mkdir -p /home/leonardovieiraxy/projetos/arqwebv01
           EOF
+          }
+          
+          # Executar com retry
+          execute_ssh || {
+            echo "First attempt failed, retrying in 10 seconds..."
+            sleep 10
+            execute_ssh
+          }
 
       - name: 📤 Transfer project files
         run: |
-          # Transferir arquivos necessários
-          scp docker-compose.yml leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
-          scp Dockerfile.spring leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
-          scp -r target leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+          # Transferir arquivos necessários usando rsync com Cloudflare tunnel
+          rsync -avz --delete \
+                -e "ssh -o ProxyCommand='cloudflared access ssh --hostname %h'" \
+                docker-compose.yml \
+                leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+          
+          rsync -avz --delete \
+                -e "ssh -o ProxyCommand='cloudflared access ssh --hostname %h'" \
+                Dockerfile.spring \
+                leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/
+          
+          rsync -avz --delete \
+                -e "ssh -o ProxyCommand='cloudflared access ssh --hostname %h'" \
+                target/ \
+                leonardovieiraxy@ssh.leoproti.com.br:/home/leonardovieiraxy/projetos/arqwebv01/target/
 
       - name: 🚀 Deploy on server
         run: |
-          ssh leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
+          ssh -o ProxyCommand="cloudflared access ssh --hostname %h" \
+              leonardovieiraxy@ssh.leoproti.com.br << 'EOF'
             cd /home/leonardovieiraxy/projetos/arqwebv01
             
             # Build e start do container
